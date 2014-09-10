@@ -1,0 +1,13 @@
+{
+  "name": "helpers",
+  "version": "0.0.0",
+  "description": "a group of utilities for the business modules",
+  "main": "index.coffee",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Maciej Mazur",
+  "dependencies": {
+    "lodash": "~2.4.1"
+  }
+}
