@@ -43,4 +43,5 @@ exports.info = (messageTemplate, var1, var2, var3) ->
 
 
 exports.error = (error) ->
-    output 'error', jsonize error
+    if environment.get() isnt 'test'
+        output 'error', error
