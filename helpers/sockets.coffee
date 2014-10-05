@@ -8,19 +8,20 @@ socketio =
 
 
 exports.getServer = (logger, port) ->
+    if not port then port = logger else isLoggerProvided = yes
+    
     application = express()
     server = http.Server application
     sockets = socketio.server server
 
     server.listen port, () ->
-        logger.info 'listening on port *:%s', port
+        if isLoggerProvided then logger.info 'listening on port *:%s', port
 
     exposed =
         instance: server
         sockets: sockets
 
 exports.getClient = (logger, port, host = 'localhost', protocol = 'http') ->
+    if not port then port = logger
+    
     socket = socketio.client protocol + '://' + host + ':' + port
-
-    exposed =
-        socket: socket
