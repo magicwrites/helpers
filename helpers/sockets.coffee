@@ -1,5 +1,6 @@
-http = require 'http'
 express = require 'express'
+http = require 'http'
+util = require 'util'
 
 socketio =
     server: require 'socket.io'
@@ -7,20 +8,68 @@ socketio =
 
 
 
-exports.getServer = (logger, port) ->
+exports.getServer = (port, logger) ->
     application = express()
     server = http.Server application
     sockets = socketio.server server
 
     server.listen port, () ->
-        logger.info 'listening on port *:%s', port
+        if logger then logger.info 'listening on port *:%s', port
 
     exposed =
         instance: server
-        sockets: sockets
+        sockets: exports.extend sockets
 
-exports.getClient = (logger, port, host = 'localhost', protocol = 'http') ->
+
+
+exports.getClient = (port, host = 'localhost', protocol = 'http') ->
     socket = socketio.client protocol + '://' + host + ':' + port
 
     exposed =
-        socket: socket
+        socket: exports.extend socket
+
+
+
+exports.extend = (emitter, logger) ->
+    originalFunctions =
+        emit: emitter.emit
+
+    emitter.emit = (eventName, data) ->
+        dataJsonized = if data then JSON.stringify data else 'no data'
+        message = util.format 'emitted %s, %s', eventName, dataJsonized
+
+        if logger then logger.info message
+        originalFunctions.emit.apply emitter, arguments
+
+    emitter.when = (defined) ->
+        if not defined then throw new Error 'emitter.when is missing definition'
+        if not defined.event then throw new Error 'emitter.when is missing tested event'
+        if not defined.passes then throw new Error 'emitter.when is missing event data tester'
+        if not defined.then then throw new Error 'emitter.when is missing callback function'
+
+        emitter.once defined.event, (data) ->
+            if defined.passes data then defined.then data else emitter.when defined
+
+    emitter.upon = (defined) ->
+        if not defined then throw new Error 'emitter.upon is missing definition'
+        if not defined.event then throw new Error 'emitter.upon is missing request event'
+        if not defined.perform then throw new Error 'emitter.upon is missing request performer method'
+        if not defined.thenRespond then throw new Error 'emitter.upon is missing response event'
+
+        emitter.on defined.event, (request) ->
+            promiseOfAuthorization = if defined.withAuthorizer then defined.withAuthorizer request else { isAuthorized: yes }
+
+            promiseOfPerforming = q
+                .when promiseOfAuthorization
+                .then (response) ->
+                    promise = if response.isAuthorized then defined.perform request else throw new Error 'unauthorized'
+
+            promiseOfResponse = q
+                .when promiseOfPerforming
+                .then (response) ->
+                    emitter.emit defined.thenRespond, response
+                .catch (error) ->
+                    request.error = error.message
+                    emitter.emit defined.thenRespond, request
+
+    return emitter
