@@ -1,6 +1,7 @@
 express = require 'express'
 http = require 'http'
 util = require 'util'
+q = require 'q'
 
 socketio =
     server: require 'socket.io'
@@ -9,24 +10,36 @@ socketio =
 
 
 exports.getServer = (port, logger) ->
+    deferred = q.defer()
+
+    if logger then logger.info 'getting server sockets on port %s', port
+
     application = express()
     server = http.Server application
     sockets = socketio.server server
-
-    server.listen port, () ->
-        if logger then logger.info 'listening on port *:%s', port
 
     exposed =
         instance: server
         sockets: exports.extend sockets
 
+    server.listen port, () ->
+        if logger then logger.info 'got server sockets established on port *:%s', port
+        deferred.resolve exposed
+
+    return deferred.promise
 
 
-exports.getClient = (port, host = 'localhost', protocol = 'http') ->
-    socket = socketio.client protocol + '://' + host + ':' + port
+
+exports.getClient = (port, logger, host = 'localhost') ->
+    if logger then logger.info 'getting socket client on port %s', port
+
+    socket = socketio.client host + ':' + port
+
+    socket.once 'connect', () ->
+        if logger then logger.info 'got client socket established on port %s', port
 
     exposed =
-        socket: exports.extend socket
+        socket: exports.extend socket, logger
 
 
 
